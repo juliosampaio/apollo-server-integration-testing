@@ -3,10 +3,15 @@
 import express from 'express';
 import httpMocks from 'node-mocks-http';
 import { print } from 'graphql';
-import { convertNodeHttpToRequest, runHttpQuery } from 'apollo-server-core';
+import {
+  convertNodeHttpToRequest,
+  runHttpQuery,
+  GraphQLOptions
+} from 'apollo-server-core';
 
 import { ApolloServer } from 'apollo-server-express';
 import { DocumentNode } from 'graphql';
+import { ValueOrPromise } from 'apollo-server-types';
 
 const mockRequest = (options = {}) =>
   httpMocks.createRequest({
@@ -59,8 +64,13 @@ export const createTestClient = ({
   const app = express();
   apolloServer.applyMiddleware({ app });
 
-  // TODO(vitorbal): add second parameter to take variables and additional request options if we need it in the future
-  const test = async (operation: StringOrAst) => {
+  const test = async (
+    operation: StringOrAst,
+    variables: Record<string, any>,
+    additionalOptions:
+      | GraphQLOptions
+      | ((...args: Array<any>) => ValueOrPromise<GraphQLOptions>)
+  ) => {
     const req = mockRequest(extendMockRequest);
     const res = mockResponse();
 
@@ -71,10 +81,11 @@ export const createTestClient = ({
 
     const { graphqlResponse } = await runHttpQuery([req, res], {
       method: 'POST',
-      options: graphQLOptions,
+      options: { ...graphQLOptions, ...additionalOptions },
       query: {
         // operation can be a string or an AST, but `runHttpQuery` only accepts a string
-        query: typeof operation === 'string' ? operation : print(operation)
+        query: typeof operation === 'string' ? operation : print(operation),
+        variables
       },
       request: convertNodeHttpToRequest(req)
     });
